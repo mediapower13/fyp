@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { CheckCircle, Mail, Wallet, AlertCircle, Loader2 } from "lucide-react";
-import { BrowserProvider, Contract } from "ethers";
+import { useState, useEffect, useCallback } from "react";
+import { CheckCircle, Mail, Wallet, Loader2 } from "lucide-react";
+import { BrowserProvider } from "ethers";
 import './index.css';
 
 // Extend the Window interface to include ethereum
@@ -35,10 +35,8 @@ const mockContract = {
 const ethersImplementation = {
   BrowserProvider: BrowserProvider,
   Contract: class {
-    constructor(address: string, abi: any[], provider: BrowserProvider) {
-      // Store contract instance for future use
-      new Contract(address, abi, provider);
-      console.log(`Contract created with address: ${address}`, { abi, provider });
+    constructor(address: string, abi: unknown[], providerOrSigner: BrowserProvider | unknown) {
+      console.log(`Contract created with address: ${address}`, { abi, providerOrSigner });
     }
     
     async isRegistered(address: string) {
@@ -71,13 +69,13 @@ function App() {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [isCheckingRegistration, setIsCheckingRegistration] = useState(false);
 
-  const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
+  const addNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, type, message }]);
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, 5000);
-  };
+  }, []);
 
   const connectWallet = async () => {
     try {
@@ -102,14 +100,19 @@ function App() {
       setAccount(accounts[0]);
       setProvider(provider);
       addNotification('success', 'Wallet connected successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Wallet connection error:', error);
       
       // Handle specific MetaMask errors
-      if (error.code === 4001) {
-        addNotification('error', 'Connection rejected by user.');
-      } else if (error.code === -32002) {
-        addNotification('error', 'Connection request is already pending. Please check MetaMask.');
+      if (error && typeof error === 'object' && 'code' in error) {
+        const errorCode = (error as { code: number }).code;
+        if (errorCode === 4001) {
+          addNotification('error', 'Connection rejected by user.');
+        } else if (errorCode === -32002) {
+          addNotification('error', 'Connection request is already pending. Please check MetaMask.');
+        } else {
+          addNotification('error', 'Failed to connect wallet. Please try again.');
+        }
       } else {
         addNotification('error', 'Failed to connect wallet. Please try again.');
       }
@@ -228,7 +231,7 @@ function App() {
     }
   };
 
-  const checkRegistration = async (provider: BrowserProvider, user: string) => {
+  const checkRegistration = useCallback(async (provider: BrowserProvider, user: string) => {
     setIsCheckingRegistration(true);
     try {
       // Replace with your actual contract address and ABI
@@ -242,14 +245,14 @@ function App() {
     } finally {
       setIsCheckingRegistration(false);
     }
-  };
+  }, [addNotification]);
 
   // Check registration status when account changes
   useEffect(() => {
     if (provider && account) {
       checkRegistration(provider, account);
     }
-  }, [provider, account]);
+  }, [provider, account, checkRegistration]);
 
     const registerVoter = async () => {
       if (!provider || !account || !emailVerified) return;
@@ -263,7 +266,7 @@ function App() {
         await tx.wait();
         setIsRegistered(true);
         addNotification('success', 'Registration completed successfully!');
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Registration error:', error);
         addNotification('error', 'Failed to register. Please try again.');
       } finally {
@@ -302,6 +305,13 @@ function App() {
                 <CheckCircle className="text-green-600 mr-2" size={20} />
                 <span className="text-green-700">Wallet Connected: {account.slice(0, 6)}...{account.slice(-4)}</span>
               </div>
+
+              {isCheckingRegistration && (
+                <div className="mb-4 p-3 bg-blue-100 rounded flex items-center">
+                  <Loader2 className="animate-spin text-blue-600 mr-2" size={20} />
+                  <span className="text-blue-700">Checking registration status...</span>
+                </div>
+              )}
   
               {!emailVerified && !isRegistered ? (
                 <div>

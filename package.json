@@ -33,5 +33,13 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mediapower13/fyp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mediapower13/fyp/issues"
+  },
+  "homepage": "https://github.com/mediapower13/fyp#readme"
 }
